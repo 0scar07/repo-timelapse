@@ -1,0 +1,109 @@
+name: repo timelapse
+description: Watch your repository grow. Renders a timelapse video and GIF of the git history and puts it in your README.
+author: 0scar07
+branding:
+  icon: git-branch
+  color: purple
+
+inputs:
+  title:
+    description: Name shown in the video. Defaults to the repository name.
+    default: ${{ github.event.repository.name }}
+  lang:
+    description: Video language, en or es.
+    default: en
+  readme:
+    description: README to update between <!-- repo-timelapse:start --> and <!-- repo-timelapse:end -->. Empty to skip.
+    default: README.md
+  output-dir:
+    description: Folder (inside the repo) where the video, GIF and data are saved.
+    default: .github/timelapse
+  vertical:
+    description: Also render a vertical 9:16 video.
+    default: 'false'
+  commit:
+    description: Commit and push the results to the default branch.
+    default: 'true'
+  release-asset:
+    description: When triggered by a release, attach the MP4 to it.
+    default: 'true'
+  token:
+    description: Token used for GitHub photos, pushing and uploading release assets.
+    default: ${{ github.token }}
+
+outputs:
+  video:
+    description: Path of the MP4.
+    value: ${{ steps.render.outputs.video }}
+  gif:
+    description: Path of the GIF.
+    value: ${{ steps.render.outputs.gif }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Check history
+      shell: bash
+      run: |
+        if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+          echo "::warning::Shallow clone detected. Use actions/checkout with fetch-depth: 0 to get the whole history. Fetching it now."
+          git fetch --unshallow --tags --quiet || true
+        fi
+
+    - name: Install repo-timelapse
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci --omit=dev --no-audit --no-fund
+
+    - name: Render
+      id: render
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        RT_TITLE: ${{ inputs.title }}
+        RT_LANG: ${{ inputs.lang }}
+        RT_DIR: ${{ inputs.output-dir }}
+        RT_README: ${{ inputs.readme }}
+        RT_VERTICAL: ${{ inputs.vertical }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$RT_DIR"
+        cli="${{ github.action_path }}/bin/cli.mjs"
+        args=(. --title "$RT_TITLE" --lang "$RT_LANG" -o "$RT_DIR/timelapse.mp4" --gif)
+        if [ -n "$RT_README" ]; then args+=(--readme "$RT_README"); fi
+        node "$cli" "${args[@]}"
+        if [ "$RT_VERTICAL" = "true" ]; then
+          node "$cli" . --title "$RT_TITLE" --lang "$RT_LANG" --vertical -o "$RT_DIR/timelapse-vertical.mp4"
+        fi
+        echo "video=$RT_DIR/timelapse.mp4" >> "$GITHUB_OUTPUT"
+        echo "gif=$RT_DIR/timelapse.gif" >> "$GITHUB_OUTPUT"
+
+    - name: Attach to the release
+      if: inputs.release-asset == 'true' && github.event_name == 'release'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        RT_DIR: ${{ inputs.output-dir }}
+      run: gh release upload "${{ github.event.release.tag_name }}" "$RT_DIR/timelapse.mp4#timelapse.mp4" --clobber
+
+    - name: Commit
+      if: inputs.commit == 'true'
+      shell: bash
+      env:
+        RT_DIR: ${{ inputs.output-dir }}
+        RT_README: ${{ inputs.readme }}
+        RT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add "$RT_DIR"
+        if [ -n "$RT_README" ] && [ -f "$RT_README" ]; then git add "$RT_README"; fi
+        if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
+        git commit -m "docs: update repo timelapse [skip ci]"
+        # en un evento de release el checkout queda en el tag: se sube a la rama principal
+        git push origin "HEAD:refs/heads/$RT_BRANCH"

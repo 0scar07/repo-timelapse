@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 · 2026-11-14
+
+- **GitHub Action** (`uses: 0scar07/repo-timelapse@v1`): renders the timelapse on every release, puts the GIF in your README and attaches the MP4 to the release.
+- The main folders are labeled on the tree.
+- Edited files flash, so the tree pulses with real activity (not only new files).
+- GitHub profile photos for the contributors (with `--github` or a GitHub `origin`); `--no-avatars` to keep initials.
+- `--gif` and `--readme <file>`.
+
 ## 0.1.0 · 2026-11-14
 
 First release.

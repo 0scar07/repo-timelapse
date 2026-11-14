@@ -11,7 +11,9 @@ export type TimelapseData = {
   totals: { commits: number; authors: number; files: number; activeDays: number };
   languages: { name: string; pct: number; color: string }[];
   nodes: TNode[];
-  authors: { name: string; initials: string; color: string; commits: number; join: number; events: [number, number][] }[];
+  labels?: { i: number; name: string }[];
+  touches?: [number, number][];
+  authors: { name: string; initials: string; color: string; commits: number; join: number; events: [number, number][]; hash?: string; avatar?: string | null }[];
   commits: { p: number; hash: string; msg: string; author: string; files: number }[];
   milestones: { kind: 'tag' | 'commits'; label: string; p: number; date: string; commits: number; authors: number; months: number }[];
   series: { commits: number[]; files: number[]; authors: number[]; time: number[]; extent: number[] };

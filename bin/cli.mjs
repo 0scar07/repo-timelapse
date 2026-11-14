@@ -24,6 +24,9 @@ const { values: o, positionals } = parseArgs({
     vertical: { type: 'boolean' },
     fps: { type: 'string' },
     'no-music': { type: 'boolean' },
+    'no-avatars': { type: 'boolean' },
+    gif: { type: 'boolean' },
+    readme: { type: 'string' },
     gl: { type: 'string' },
     out: { type: 'string', short: 'o' },
     json: { type: 'boolean' },
@@ -57,6 +60,9 @@ if (o.help) {
   --vertical            ${es ? 'Formato vertical 9:16 para TikTok, Reels y Shorts' : 'Vertical 9:16 for TikTok, Reels and Shorts'}
   --fps 30|60           ${es ? 'Fotogramas por segundo (30 por defecto)' : 'Frames per second (default 30)'}
   --no-music            ${es ? 'Video sin audio' : 'Silent video'}
+  --no-avatars          ${es ? 'Iniciales en vez de las fotos de GitHub' : 'Initials instead of GitHub photos'}
+  --gif                 ${es ? 'Genera también un GIF (para READMEs)' : 'Also make a GIF (for READMEs)'}
+  --readme <archivo>    ${es ? 'Pone el GIF en ese README, entre marcadores' : 'Put the GIF into that README, between markers'}
   --gl <modo>           ${es ? 'Renderizado de Chrome: angle (GPU), swangle, default…' : 'Chrome rendering: angle (GPU), swangle, default…'}
   -o, --out <archivo>   ${es ? 'Archivo de salida' : 'Output file'}
   --json                ${es ? 'Solo imprime los datos, sin renderizar' : 'Print the data only, no render'}
@@ -98,6 +104,10 @@ if (o.demo) {
   }
   log('Leyendo la historia…', 'Reading the history…');
   data = analyzeRepo(repo, { since: o.since, until: o.until, name, lang });
+  if (data) {
+    const { githubSlug } = await import('../src/github.mjs');
+    data.slug = githubSlug(repo, o.github ? o.github.replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/$/, '') : null);
+  }
   cleanup?.();
   if (!data) fail('Ese repo no tiene commits (o ninguno en ese rango de fechas).', 'That repo has no commits (or none in that date range).');
 }
@@ -119,6 +129,14 @@ if (!o['no-music']) {
   const { synthMusic } = await import('../src/music.mjs');
   writeFileSync(path.join(publicDir, 'music.wav'), synthMusic(tl));
   music = 'music.wav';
+}
+// fotos de perfil de GitHub para los avatares (si el repo es de GitHub)
+if (data.slug && !o['no-avatars'] && data.authors.length) {
+  const { fetchAvatars } = await import('../src/github.mjs');
+  const files = await fetchAvatars({ slug: data.slug, authors: data.authors, token: o.token || process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '', outDir: publicDir });
+  data.authors.forEach((a, i) => { a.avatar = files[i]; });
+  const got = files.filter(Boolean).length;
+  if (got) say(`Fotos de GitHub: ${got}/${files.length}`, `GitHub photos: ${got}/${files.length}`);
 }
 
 const { bundle } = await import('@remotion/bundler');
@@ -142,7 +160,24 @@ try { await render(); } catch (err) {
   say('\nLa aceleración por GPU falló; reintento sin ella…', '\nGPU acceleration failed; retrying without it…');
   gl = null; await render();
 }
-rmSync(publicDir, { recursive: true, force: true });
 console.log('');
+const base = out.replace(/\.mp4$/i, '');
+if (o.gif || o.readme) {
+  // GIF liviano para READMEs: 10 fps y ~576 px de ancho
+  let last = -1;
+  await renderMedia({
+    composition, serveUrl, inputProps, codec: 'gif', outputLocation: base + '.gif', everyNthFrame: fps / 10, scale: o.vertical ? 0.4 : 0.3, muted: true,
+    chromiumOptions: gl && gl !== 'default' ? { gl } : {},
+    onProgress: ({ progress }) => { const p = Math.floor(progress * 100); if (p !== last && p % 10 === 0) { last = p; process.stdout.write(`\rGIF ${p}%   `); } },
+  });
+  console.log('');
+  say(`GIF: ${base}.gif`, `GIF: ${base}.gif`);
+}
+if (o.readme) {
+  const { updateReadme } = await import('../src/readme.mjs');
+  updateReadme({ readme: path.resolve(o.readme), image: base + '.gif', video: out, lang, name: data.name });
+  say(`README actualizado: ${path.resolve(o.readme)}`, `README updated: ${path.resolve(o.readme)}`);
+}
+rmSync(publicDir, { recursive: true, force: true });
 const secs = Math.round((Date.now() - t0) / 1000);
 say(`Listo en ${secs} s: ${out}\nCompártelo con #RepoTimelapse`, `Done in ${secs}s: ${out}\nShare it with #RepoTimelapse`);

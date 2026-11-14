@@ -142,6 +142,22 @@ export function buildTimelapse({ commits, tags = [], name, lang = 'en' }) {
     if (nd.dir) { let acc = a0; for (const k of nd.sorted) { const sp = (a1 - a0) * k.leaves / nd.leaves; lay(k, acc, acc + sp, idx); acc += sp; } }
   })(root, -Math.PI / 2, Math.PI * 1.5, -1);
 
+  // --- etiquetas: las carpetas de primer nivel con peso (y las de segundo si solo hay una grande) ---
+  const totalLeaves = root.leaves || 1;
+  let labelDirs = root.sorted.filter(k => k.dir && k.leaves / totalLeaves >= 0.04);
+  if (labelDirs.length <= 1) labelDirs = labelDirs.flatMap(k => k.sorted.filter(s => s.dir && s.leaves / totalLeaves >= 0.04)).concat(labelDirs);
+  const labels = labelDirs.sort((a, b) => b.leaves - a.leaves).slice(0, 10)
+    .map(k => ({ i: k.idx, name: k.name.length > 16 ? k.name.slice(0, 15) + '…' : k.name }));
+
+  // --- toques: cada vez que se modifica un archivo (sin contar su nacimiento), para que el árbol "lata" ---
+  const touchList = [];
+  for (const f of all) {
+    const leaf = leafOfFile.get(f.path);
+    for (const tp of f.touches) if (tp > f.birth + 1e-9) touchList.push([+tp.toFixed(4), leaf.idx]);
+  }
+  touchList.sort((a, b) => a[0] - b[0]);
+  const touches = touchList.length <= 6000 ? touchList : Array.from({ length: 6000 }, (_, i) => touchList[Math.floor(i * touchList.length / 6000)]);
+
   // --- series muestreadas: commits, archivos vivos, personas, fecha y tamaño del árbol visible ---
   const at = k => k / (N - 1);
   const commitsAt = [], filesAt = [], authorsAt = [], timeAt = [], extentAt = [];
@@ -168,7 +184,8 @@ export function buildTimelapse({ commits, tags = [], name, lang = 'en' }) {
   for (const c of commits) {
     const key = c.email || c.author;
     let a = byAuthor.get(key);
-    if (!a) { a = { name: c.author, commits: 0, join: c.p, events: [] }; byAuthor.set(key, a); }
+    if (!a) { a = { name: c.author, email: c.email, commits: 0, join: c.p, events: [], hash: c.hash }; byAuthor.set(key, a); }
+    a.hash = c.hash; // el último commit, para buscar su foto en GitHub
     a.commits++;
     for (const [f, st] of c.files) if (st !== 'D' && leafOfFile.has(f)) { a.events.push([+c.p.toFixed(4), leafOfFile.get(f).idx]); break; }
   }
@@ -177,7 +194,7 @@ export function buildTimelapse({ commits, tags = [], name, lang = 'en' }) {
   const isBot = a => /\[bot\]$|^(dependabot|renovate|github-actions|greenkeeper|snyk-bot|semantic-release-bot)\b/i.test(a.name);
   const authors = [...byAuthor.values()].filter(a => !isBot(a)).sort((a, b) => b.commits - a.commits).slice(0, 5).map((a, i) => ({
     name: a.name.length > 18 ? a.name.slice(0, 17) + '…' : a.name, initials: initials(a.name), color: AUTHOR_COLORS[i],
-    commits: a.commits, join: +a.join.toFixed(4), events: sample(a.events, 160),
+    commits: a.commits, join: +a.join.toFixed(4), events: sample(a.events, 160), hash: a.hash, avatar: null,
   }));
 
   // --- commits para la tarjeta que va pasando ---
@@ -223,7 +240,7 @@ export function buildTimelapse({ commits, tags = [], name, lang = 'en' }) {
     first: new Date(t0).toISOString(), last: new Date(t1).toISOString(),
     firstCommit: { hash: commits[0].hash.slice(0, 7), msg: commits[0].subject.slice(0, 50) },
     totals: { commits: n, authors: byAuthor.size, files: filesAt[N - 1], activeDays: new Set(commits.map(c => new Date(c.t).toISOString().slice(0, 10))).size },
-    languages, nodes, authors, commits: commitCards, milestones: ms,
+    languages, nodes, labels, touches, authors, commits: commitCards, milestones: ms,
     series: { commits: commitsAt, files: filesAt, authors: authorsAt, time: timeAt, extent: extentAt },
     collapsed: maxDepth < Math.max(1, ...all.map(f => depthOf(f.path))),
   };

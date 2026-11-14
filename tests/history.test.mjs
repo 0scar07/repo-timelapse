@@ -117,3 +117,22 @@ test('guion: duración, pausas en los hitos y progreso', () => {
   assert.equal(tl.prog(tl.growthEnd + 1), 1);
   assert.ok(growthSeconds(1) >= 14 && growthSeconds(1e7) <= 40);
 });
+
+test('etiquetas de carpetas y toques de edición', () => {
+  const d = analyzeRepo(repo);
+  assert.ok(d.labels.some(l => l.name === 'src'));
+  for (const l of d.labels) assert.equal(d.nodes[l.i].dir, 1);
+  // src/index.ts se editó después de nacer (commit 'feat: more')
+  assert.ok(d.touches.length >= 1);
+  assert.ok(d.touches.every(([tp, ni]) => tp >= d.nodes[ni].b && d.nodes[ni].dir === 0));
+});
+
+test('README: inserta y actualiza el bloque entre marcadores', async () => {
+  const { updateReadme, START, END } = await import('../src/readme.mjs');
+  const file = path.join(root, 'README.md');
+  const { writeFileSync, readFileSync } = await import('node:fs');
+  writeFileSync(file, `# Proyecto\n\n${START}\nviejo\n${END}\n\nFin\n`);
+  updateReadme({ readme: file, image: path.join(root, 'x/t.gif'), video: path.join(root, 'x/t.mp4'), lang: 'en', name: 'demo' });
+  const txt = readFileSync(file, 'utf8');
+  assert.ok(txt.includes('x/t.gif') && !txt.includes('viejo') && txt.endsWith('Fin\n'));
+});

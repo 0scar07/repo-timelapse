@@ -1,5 +1,5 @@
 import React, { CSSProperties, useMemo } from 'react';
-import { AbsoluteFill, Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Audio, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { loadFont as loadInter } from '@remotion/google-fonts/Inter';
 import { loadFont as loadMono } from '@remotion/google-fonts/JetBrainsMono';
 import { makeTimeline } from '../timing.mjs';
@@ -62,6 +62,19 @@ const Scene: React.FC<{ data: TimelapseData }> = ({ data }) => {
   const cy = L(V ? H * 0.47 : H / 2 - 18, V ? H * 0.3 : H / 2, end) + (V ? 260 : 190) * introZoom;
   const dim = 1 - 0.62 * (pz.i >= 0 ? win(pz.k, 0, 0.12, 0.86, 1) : 0);
 
+  // toques por archivo (ordenados), para el destello al editar
+  const touchMap = useMemo(() => {
+    const m = new Map<number, number[]>();
+    for (const [tp, ni] of data.touches ?? []) { let a = m.get(ni); if (!a) m.set(ni, (a = [])); a.push(tp); }
+    return m;
+  }, [data.touches]);
+  const lastTouch = (ni: number) => {
+    const a = touchMap.get(ni); if (!a || a[0] > p) return -1;
+    let lo = 0, hi = a.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (a[mid] <= p) lo = mid; else hi = mid - 1; }
+    return a[lo];
+  };
+
   // --- árbol (SVG en texto: rápido incluso con cientos de nodos) ---
   let edges = '', dots = '';
   for (let i = 1; i < nodes.length; i++) {
@@ -80,12 +93,26 @@ const Scene: React.FC<{ data: TimelapseData }> = ({ data }) => {
     if (n.dir) {
       dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${((n.depth === 1 ? 6 : 3.6) * zoomR * life).toFixed(1)}" fill="#6b5ce0"/>`;
     } else {
-      const fresh = cl(1 - age / 1.2);
+      // brilla al nacer y, más suave, cada vez que alguien lo modifica
+      const lt = lastTouch(i);
+      const edit = lt >= 0 ? cl(1 - ((p - lt) * G) / 0.7) * 0.75 : 0;
+      const fresh = Math.max(cl(1 - age / 1.2), edit);
       const r = (5.2 + Math.min(4, Math.log2(1 + n.w)) + 2.5 * fresh) * zoomR * k * life;
       if (fresh > 0.02) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r + 16 * fresh).toFixed(1)}" fill="${n.c}" opacity="${(0.3 * fresh).toFixed(2)}"/>`;
       if (life < 1) dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(r + 10 * (1 - life)).toFixed(1)}" fill="#FF7A9A" opacity="${(0.35 * life).toFixed(2)}"/>`;
       dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${n.c}"/>`;
     }
+  }
+  // nombres de las carpetas principales, hacia afuera de su rama
+  if (t >= 3) for (const lb of data.labels ?? []) {
+    const n = nodes[lb.i];
+    if (!n || n.b > p || (n.d !== null && p >= n.d)) continue;
+    const o = cl(((p - n.b) * G - 0.3) / 0.6) * (1 - end * 0.6);
+    if (o < 0.02) continue;
+    const ang = Math.atan2(n.y, n.x), x = cx + n.x * sc + Math.cos(ang) * 26, y = cy + n.y * sc + Math.sin(ang) * 26;
+    const anchor = Math.cos(ang) > 0.3 ? 'start' : Math.cos(ang) < -0.3 ? 'end' : 'middle';
+    const fs = Math.max(16, Math.min(24, 20 * sc));
+    dots += `<text x="${x.toFixed(1)}" y="${(y + fs * 0.35).toFixed(1)}" text-anchor="${anchor}" font-family='${mono.replace(/'/g, '"')}' font-size="${fs.toFixed(1)}" font-weight="500" fill="#cfc8ff" stroke="#0B0B10" stroke-width="5" paint-order="stroke" opacity="${o.toFixed(2)}">${lb.name.replace(/[<&>]/g, '')}/</text>`;
   }
   const pulse = 1 + 0.15 * Math.sin(t * 4);
   dots += `<circle cx="${cx}" cy="${cy}" r="${(34 * pulse * Math.max(0.7, Math.min(1.4, sc))).toFixed(1)}" fill="#9D8CFF" opacity=".15"/><circle cx="${cx}" cy="${cy}" r="${(13 * Math.max(0.8, Math.min(1.3, sc))).toFixed(1)}" fill="#9D8CFF"/>`;
@@ -112,7 +139,7 @@ const Scene: React.FC<{ data: TimelapseData }> = ({ data }) => {
     if (bo > 0.02) beams += `<line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="${a.color}" stroke-width="3" stroke-dasharray="2 8" stroke-dashoffset="${(-t * 40).toFixed(1)}" stroke-linecap="round" opacity="${(0.85 * bo).toFixed(2)}"/>`;
     return (
       <div key={ai} className="avatar" style={{ left: ax, top: ay, opacity: o, background: a.color, boxShadow: `0 0 0 5px rgba(11,11,16,.9), 0 0 30px ${a.color}` }}>
-        <span>{a.initials}</span><small>{a.name}</small>
+        {a.avatar ? <Img src={staticFile(a.avatar)} style={{ width: 62, height: 62, borderRadius: '50%', objectFit: 'cover', border: `3px solid ${a.color}` }} /> : <span>{a.initials}</span>}<small>{a.name}</small>
       </div>
     );
   });

@@ -1,6 +1,6 @@
 {
   "name": "repo-timelapse",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Watch your git repository grow: a timelapse video of its history, with one command. Mira crecer tu repo en un video.",
   "type": "module",
   "bin": {

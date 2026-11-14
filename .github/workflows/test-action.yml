@@ -1,0 +1,41 @@
+name: Test the action
+
+# Prueba la Action de este repo sobre su propia historia, sin hacer commit.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: [action.yml, bin/cli.mjs, src/readme.mjs, src/github.mjs]
+
+permissions:
+  contents: read
+
+jobs:
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fake README
+        run: printf '# Hi\n\nSome intro.\n' > PROFILE.md
+      - uses: ./
+        id: tl
+        with:
+          readme: PROFILE.md
+          output-dir: out
+          commit: 'false'
+          release-asset: 'false'
+      - name: Check results
+        run: |
+          ls -la out
+          test -s "${{ steps.tl.outputs.video }}"
+          test -s "${{ steps.tl.outputs.gif }}"
+          grep -q 'repo-timelapse:start' PROFILE.md
+          cat PROFILE.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: timelapse
+          path: |
+            out/
+            PROFILE.md
+          retention-days: 7

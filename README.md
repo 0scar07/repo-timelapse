@@ -41,13 +41,55 @@ It only downloads the history (commits and folder structure), not the file conte
 | Moment | What happens |
 |---|---|
 | Intro | The repo name, the day it started and its first commit, as a seed |
-| Growth | Folders are branches and files are lights, colored by language. New files glow, deleted ones fade out in red. The camera pulls back as the tree grows |
-| Contributors | The top contributors jump to the files they touch, with a dotted beam |
+| Growth | Folders are branches and files are lights, colored by language. The main folders are labeled. New files glow, edited files flash, deleted ones fade out in red. The camera pulls back as the tree grows |
+| Contributors | The top contributors jump to the files they touch, with a dotted beam. On GitHub repos they show their real profile photo |
 | Milestones | At each big release (`v1.0.0`, `2.0.0`…) or round number of commits, time stops and a card shows how far the project had come |
 | HUD | Live counters of commits, files and people, the latest commit, and a timeline with every milestone |
 | Ending | The full tree and a summary: how long, how many commits, people, files and active days |
 
 The video length adapts to the history: from about 25 seconds for small repos to about a minute for big ones. Milestones are picked automatically from your tags.
+
+## In your README, on every release
+
+Add `.github/workflows/timelapse.yml` and your README will show how the project grew, updated on each release (the MP4 is also attached to the release):
+
+```yaml
+name: timelapse
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  timelapse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                                   # the whole history
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: 0scar07/repo-timelapse@v1
+```
+
+Put these two lines where you want the GIF; otherwise it goes at the end:
+
+```md
+<!-- repo-timelapse:start -->
+<!-- repo-timelapse:end -->
+```
+
+| Input | Default | What it does |
+|---|---|---|
+| `title` | repo name | Name shown in the video |
+| `lang` | `en` | `en` or `es` |
+| `readme` | `README.md` | README to update (empty to skip) |
+| `output-dir` | `.github/timelapse` | Where the MP4, GIF and data go |
+| `vertical` | `false` | Also render a 9:16 video |
+| `release-asset` | `true` | Attach the MP4 to the release that triggered it |
+| `commit` | `true` | Commit and push to the default branch |
 
 ## Options
 
@@ -61,6 +103,9 @@ The video length adapts to the history: from about 25 seconds for small repos to
 | `--vertical` | Vertical 9:16 video for TikTok, Reels and Shorts |
 | `--fps 30\|60` | Frame rate (default 30) |
 | `--no-music` | Silent video |
+| `--no-avatars` | Initials instead of GitHub profile photos |
+| `--gif` | Also make a light GIF (for READMEs) |
+| `--readme <file>` | Put the GIF into that README, between markers |
 | `--gl <mode>` | Chrome rendering: `angle` (GPU, default on Windows and macOS), `swangle`, `default` |
 | `-o, --out <file>` | Output file |
 | `--json` | Print the computed data and skip rendering |
