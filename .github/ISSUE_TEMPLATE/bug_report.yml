@@ -1,0 +1,30 @@
+name: Bug report
+description: Something doesn't work or looks wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include a screenshot of the video if it's a visual problem.
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      placeholder: npx repo-timelapse --github owner/repo
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Terminal output
+      render: shell
+  - type: input
+    id: env
+    attributes:
+      label: OS, Node and git versions
+      placeholder: Windows 11, Node 22.20, git 2.47
+    validations:
+      required: true

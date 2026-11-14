@@ -1,0 +1,40 @@
+name: Publish to npm
+
+# Publica en npm al crear una release en GitHub.
+# Requiere el secreto NPM_TOKEN (npmjs.com → Access Tokens → Granular, con permiso de publicación).
+# Sin el secreto, o si esa versión ya está en npm, el job termina sin publicar.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write # provenance de npm
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Should publish?
+        id: check
+        run: |
+          v=$(node -p "require('./package.json').version")
+          if [ -z "$NPM_TOKEN" ]; then echo "No NPM_TOKEN secret: skipping"; echo "go=false" >> "$GITHUB_OUTPUT"
+          elif npm view "repo-timelapse@$v" version >/dev/null 2>&1; then echo "$v is already on npm: skipping"; echo "go=false" >> "$GITHUB_OUTPUT"
+          else echo "go=true" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.check.outputs.go == 'true'
+        run: npm ci
+      - if: steps.check.outputs.go == 'true'
+        run: npm run typecheck && npm test
+      - if: steps.check.outputs.go == 'true'
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

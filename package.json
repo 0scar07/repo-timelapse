@@ -1,0 +1,58 @@
+{
+  "name": "repo-timelapse",
+  "version": "0.1.0",
+  "description": "Watch your git repository grow: a timelapse video of its history, with one command. Mira crecer tu repo en un video.",
+  "type": "module",
+  "bin": {
+    "repo-timelapse": "bin/cli.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "assets"
+  ],
+  "scripts": {
+    "studio": "remotion studio src/remotion/index.ts",
+    "demo": "node bin/cli.mjs --demo",
+    "test": "node --test tests/history.test.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "git",
+    "timelapse",
+    "gource",
+    "visualization",
+    "remotion",
+    "video",
+    "cli",
+    "history",
+    "data-visualization"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/0scar07/repo-timelapse.git"
+  },
+  "homepage": "https://github.com/0scar07/repo-timelapse#readme",
+  "bugs": {
+    "url": "https://github.com/0scar07/repo-timelapse/issues"
+  },
+  "author": "0scar07",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.543",
+    "@remotion/cli": "4.0.543",
+    "@remotion/google-fonts": "4.0.543",
+    "@remotion/layout-utils": "4.0.543",
+    "@remotion/renderer": "4.0.543",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.543"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}
