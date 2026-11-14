@@ -1,5 +1,6 @@
 node_modules/
-*.mp4
-*.gif
-repo-timelapse-*.json
 out/
+# videos y GIFs generados al probar en la raíz (los de docs/ sí se suben)
+/*.mp4
+/*.gif
+repo-timelapse-*.json
